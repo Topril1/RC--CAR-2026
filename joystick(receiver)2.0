@@ -1,0 +1,88 @@
+#include <WiFi.h>
+#include <esp_now.h>
+
+#define M1_A 4
+#define M1_B 7
+#define M2_A 3
+#define M2_B 1
+
+typedef struct {
+  int joy1_x;  // steering
+  int joy2_y;  // throttle
+} JoyData;
+
+JoyData data;
+
+int deadzone = 400;   // joystick center tolerance
+int center   = 2048;  // ESP32 ADC center
+
+void stopMotors() {
+  digitalWrite(M1_A, LOW);
+  digitalWrite(M1_B, LOW);
+  digitalWrite(M2_A, LOW);
+  digitalWrite(M2_B, LOW);
+}
+
+void onReceive(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len) {
+  memcpy(&data, incomingData, sizeof(data));
+
+  int steer    = data.joy1_x - center;
+  int throttle = data.joy2_y - center;
+
+  // Default stop
+  stopMotors();
+
+  // Forward / Backward
+  if (throttle > deadzone) {
+    // Forward
+    digitalWrite(M1_A, HIGH);
+    digitalWrite(M2_A, HIGH);
+  } 
+  else if (throttle < -deadzone) {
+    // Reverse
+    digitalWrite(M1_B, HIGH);
+    digitalWrite(M2_B, HIGH);
+  }
+
+  // Steering (overrides slightly)
+  if (steer > deadzone) {
+    // Turn right
+    digitalWrite(M1_A, HIGH);
+    digitalWrite(M2_B, HIGH);
+  } 
+  else if (steer < -deadzone) {
+    // Turn left
+    digitalWrite(M1_B, HIGH);
+    digitalWrite(M2_A, HIGH);
+  }
+
+  Serial.print("Steer: ");
+  Serial.print(steer);
+  Serial.print(" | Throttle: ");
+  Serial.println(throttle);
+}
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.mode(WIFI_STA);
+
+  pinMode(M1_A, OUTPUT);
+  pinMode(M1_B, OUTPUT);
+  pinMode(M2_A, OUTPUT);
+  pinMode(M2_B, OUTPUT);
+
+  stopMotors();
+
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW init failed");
+    return;
+  }
+
+  esp_now_register_recv_cb(onReceive);
+
+  Serial.println("Receiver + Motors ready");
+}
+
+void loop() {
+  // nothing here
+}
