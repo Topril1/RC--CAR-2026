@@ -1,0 +1,80 @@
+#include <WiFi.h>
+#include <esp_now.h>
+
+// Data struct must match transmitter
+typedef struct {
+  int joy1Y; // vertical
+  int joy2X; // horizontal
+} DataPacket;
+
+DataPacket data;
+
+// Motor pins
+#define MOTOR1_A 7
+#define MOTOR1_B 4
+#define MOTOR2_A 1
+#define MOTOR2_B 3
+
+void onReceive(const esp_now_recv_info *info,
+               const uint8_t *incomingData,
+               int len) {
+
+  memcpy(&data, incomingData, sizeof(data));
+
+  // 🔹 Motor 1 (vertical joystick)
+  if (data.joy1Y > 3500) {
+    digitalWrite(MOTOR1_A, HIGH);
+    digitalWrite(MOTOR1_B, LOW);
+  } else if (data.joy1Y < 500) {
+    digitalWrite(MOTOR1_A, LOW);
+    digitalWrite(MOTOR1_B, HIGH);
+  } else {
+    digitalWrite(MOTOR1_A, LOW);
+    digitalWrite(MOTOR1_B, LOW);
+  }
+
+  // 🔹 Motor 2 (horizontal joystick)
+  if (data.joy2X > 3500) {
+    digitalWrite(MOTOR2_A, HIGH);
+    digitalWrite(MOTOR2_B, LOW);
+  } else if (data.joy2X < 500) {
+    digitalWrite(MOTOR2_A, LOW);
+    digitalWrite(MOTOR2_B, HIGH);
+  } else {
+    digitalWrite(MOTOR2_A, LOW);
+    digitalWrite(MOTOR2_B, LOW);
+  }
+
+  // Debug output
+  Serial.print("Y1: ");
+  Serial.print(data.joy1Y);
+  Serial.print(" | X2: ");
+  Serial.println(data.joy2X);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  Serial.println("Receiver starting");
+
+  pinMode(MOTOR1_A, OUTPUT);
+  pinMode(MOTOR1_B, OUTPUT);
+  pinMode(MOTOR2_A, OUTPUT);
+  pinMode(MOTOR2_B, OUTPUT);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.setChannel(1);
+
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW init failed");
+    return;
+  }
+
+  Serial.println("ESP-NOW ready");
+  esp_now_register_recv_cb(onReceive);
+}
+
+void loop() {
+  // nothing needed
+}
